@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Send, Sparkles, CheckCircle2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowUp, Sparkles, CheckCircle2, Menu, Plus, Bot, User } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 interface Message {
@@ -13,240 +12,341 @@ interface Message {
 
 interface AgentPlan {
   goal: string;
-  objects: string[];
-  action: string;
-  frequency: string;
-  threshold?: string;
+  inputs: string[];
+  actions: string[];
+  tools: string[];
+  output: string;
 }
 
 const Builder = () => {
+  const navigate = useNavigate();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hi! I'll help you create an AI agent. Just tell me what you want to automate in plain English. For example: 'Alert me when sneakers drop below ₹7,000 on VegNonVeg'"
+      content: "Hi! I'm here to help you create an AI agent. Just describe what you want to automate in plain English.\n\nFor example:\n• \"Alert me when sneakers drop below ₹7,000\"\n• \"Email me a daily summary of my sales\"\n• \"Notify me when my favorite YouTuber posts\""
     }
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [agentPlan, setAgentPlan] = useState<AgentPlan | null>(null);
-  const [isComplete, setIsComplete] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
 
     const userMessage = input.trim();
     setInput("");
     setMessages(prev => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
 
-    // Simulate AI response (in real app, this would call Lovable AI)
+    // Simulate AI response
     setTimeout(() => {
-      // Simple pattern matching for demo
       const lowerInput = userMessage.toLowerCase();
       
       if (messages.length === 1) {
         // First user message - parse intent
-        if (lowerInput.includes("alert") || lowerInput.includes("notify")) {
+        if (lowerInput.includes("alert") || lowerInput.includes("notify") || lowerInput.includes("tell me when")) {
           setMessages(prev => [...prev, {
             role: "assistant",
-            content: "Got it! I understand you want to receive alerts. How often should I check? (e.g., 'daily', 'every hour', 'every 6 hours')"
+            content: "I understand you want to receive alerts. Let me ask a few questions:\n\nHow often should I check for updates?\n• Every hour\n• Daily\n• Every 6 hours"
           }]);
-        } else if (lowerInput.includes("email") || lowerInput.includes("summary")) {
+          setAgentPlan({
+            goal: "Monitor and alert",
+            inputs: ["Price threshold", "Target websites"],
+            actions: ["Check prices", "Compare values"],
+            tools: ["Web scraper", "Notifier"],
+            output: "Alert notification"
+          });
+          setShowPanel(true);
+        } else if (lowerInput.includes("email") || lowerInput.includes("summary") || lowerInput.includes("report")) {
           setMessages(prev => [...prev, {
             role: "assistant",
-            content: "Perfect! I'll set up an email summary for you. What time should I send it? (e.g., '9 AM', 'every morning')"
+            content: "Perfect! I'll help you set up an automated summary.\n\nWhat time would you like to receive it?\n• Morning (9 AM)\n• Evening (6 PM)\n• Custom time"
           }]);
+          setAgentPlan({
+            goal: "Generate and send summary",
+            inputs: ["Data source", "Time preference"],
+            actions: ["Gather data", "Summarize", "Send email"],
+            tools: ["Data fetcher", "AI summarizer", "Email sender"],
+            output: "Daily email summary"
+          });
+          setShowPanel(true);
         } else {
           setMessages(prev => [...prev, {
             role: "assistant",
-            content: "I'd love to help! Could you tell me more about what you want to happen? For example, do you want alerts, summaries, or something else?"
+            content: "I'd love to help! Could you tell me a bit more?\n\nWhat would you like the agent to do:\n• Monitor something and alert you\n• Create summaries or reports\n• Automate a repetitive task"
           }]);
         }
       } else if (messages.length === 3) {
-        // Second user message - confirm frequency
+        // Second response - frequency/time
         setMessages(prev => [...prev, {
           role: "assistant",
-          content: "Great! Let me summarize what I understood. Does this look correct?"
+          content: "Great choice! One more thing:\n\nHow would you like to be notified?\n• WhatsApp message\n• Email\n• Both"
         }]);
         
-        // Create agent plan
-        setAgentPlan({
-          goal: "Price monitoring with alerts",
-          objects: ["VegNonVeg", "Superkicks"],
-          action: "WhatsApp notification",
-          frequency: userMessage,
-          threshold: "₹7,000"
-        });
+        if (agentPlan) {
+          setAgentPlan({
+            ...agentPlan,
+            tools: [...agentPlan.tools, "Scheduler"]
+          });
+        }
       } else if (messages.length === 5) {
-        // Confirmation
+        // Third response - notification method
         setMessages(prev => [...prev, {
           role: "assistant",
-          content: "Perfect! Your agent is ready to go. I'll start monitoring right away. 🎉"
+          content: "Perfect! I've configured everything. Your agent plan is ready.\n\nTake a look at the summary on the right and click \"Create Agent\" when you're happy with it."
         }]);
-        setIsComplete(true);
-        toast.success("Agent created successfully!");
+        
+        if (agentPlan) {
+          setAgentPlan({
+            ...agentPlan,
+            output: lowerInput.includes("both") ? "WhatsApp + Email" : 
+                    lowerInput.includes("whatsapp") ? "WhatsApp notification" : "Email notification"
+          });
+        }
+        setIsReady(true);
       }
       
       setIsLoading(false);
-    }, 1000);
+    }, 1200);
+  };
+
+  const handleCreateAgent = () => {
+    toast.success("Agent created successfully!", {
+      description: "Your agent is now active and running."
+    });
+    setTimeout(() => navigate("/dashboard"), 1500);
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar */}
+      <aside className="hidden lg:flex w-64 flex-col border-r border-border/50 bg-card/30">
+        <div className="p-4 border-b border-border/50">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="font-heading font-semibold text-foreground">Genie-us</span>
+          </Link>
+        </div>
+        
+        <div className="p-3">
+          <Button variant="outline" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground" onClick={() => window.location.reload()}>
+            <Plus className="w-4 h-4" />
+            New Agent
+          </Button>
+        </div>
+        
+        <div className="flex-1 p-3">
+          <p className="text-xs text-muted-foreground px-2 mb-2">Recent</p>
+          <div className="space-y-1">
+            <div className="p-2 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+              Current conversation
+            </div>
+          </div>
+        </div>
+        
+        <div className="p-4 border-t border-border/50">
+          <Link to="/dashboard">
+            <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground">
+              View Dashboard
             </Button>
           </Link>
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            <span className="font-semibold">Agent Builder</span>
-          </div>
-          <div className="w-20" /> {/* Spacer for centering */}
         </div>
-      </header>
+      </aside>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Chat Column */}
-          <div className="lg:col-span-2">
-            <Card className="p-6 min-h-[600px] flex flex-col bg-card/50 backdrop-blur-sm border-border/50">
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-                {messages.map((message, i) => (
-                  <div
-                    key={i}
-                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[80%] p-4 rounded-2xl ${
-                        message.role === "user"
-                          ? "bg-primary text-primary-foreground ml-12"
-                          : "bg-muted text-foreground mr-12"
-                      }`}
-                    >
-                      <p className="leading-relaxed">{message.content}</p>
-                    </div>
-                  </div>
-                ))}
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="max-w-[80%] p-4 rounded-2xl bg-muted">
-                      <div className="flex gap-2">
-                        <div className="w-2 h-2 rounded-full bg-foreground/50 animate-bounce" />
-                        <div className="w-2 h-2 rounded-full bg-foreground/50 animate-bounce" style={{ animationDelay: '0.2s' }} />
-                        <div className="w-2 h-2 rounded-full bg-foreground/50 animate-bounce" style={{ animationDelay: '0.4s' }} />
-                      </div>
-                    </div>
-                  </div>
-                )}
+      {/* Main Chat Area */}
+      <main className="flex-1 flex flex-col">
+        {/* Mobile Header */}
+        <header className="lg:hidden flex items-center justify-between p-4 border-b border-border/50">
+          <Button variant="ghost" size="icon">
+            <Menu className="w-5 h-5" />
+          </Button>
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
+            </div>
+            <span className="font-heading font-semibold text-foreground">Genie-us</span>
+          </Link>
+          <Button variant="ghost" size="icon" onClick={() => setShowPanel(!showPanel)}>
+            <Sparkles className="w-5 h-5" />
+          </Button>
+        </header>
+
+        {/* Messages Container */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+            {messages.map((message, i) => (
+              <div
+                key={i}
+                className="flex gap-4 animate-fade-in"
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  message.role === "assistant" 
+                    ? "bg-gradient-to-br from-primary to-primary-glow" 
+                    : "bg-muted"
+                }`}>
+                  {message.role === "assistant" ? (
+                    <Bot className="w-4 h-4 text-primary-foreground" />
+                  ) : (
+                    <User className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 pt-1">
+                  <p className="text-foreground leading-relaxed whitespace-pre-line">{message.content}</p>
+                </div>
               </div>
+            ))}
+            
+            {isLoading && (
+              <div className="flex gap-4 animate-fade-in">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center flex-shrink-0">
+                  <Bot className="w-4 h-4 text-primary-foreground" />
+                </div>
+                <div className="flex items-center gap-1 pt-2">
+                  <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" />
+                  <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0.15s' }} />
+                  <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0.3s' }} />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
 
-              {/* Input */}
-              {!isComplete && (
-                <div className="flex gap-2">
-                  <Input
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                    placeholder="Type your message..."
-                    disabled={isLoading}
-                    className="flex-1 bg-background/50"
-                  />
+        {/* Input Area */}
+        <div className="p-4 border-t border-border/50">
+          <div className="max-w-3xl mx-auto">
+            <div className="relative">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+                placeholder="Describe what you want your agent to do..."
+                disabled={isLoading}
+                className="pr-12 h-14 rounded-xl bg-muted/50 border-border/50 focus-visible:ring-primary/50 text-base"
+              />
+              <Button
+                onClick={handleSend}
+                disabled={isLoading || !input.trim()}
+                size="icon"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-30"
+              >
+                <ArrowUp className="w-5 h-5" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              Press Enter to send your message
+            </p>
+          </div>
+        </div>
+      </main>
+
+      {/* Right Panel - Agent Plan */}
+      <aside className={`${showPanel ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'} fixed lg:relative right-0 top-0 h-full w-80 border-l border-border/50 bg-card/30 backdrop-blur-xl transition-transform z-50 lg:z-0`}>
+        <div className="p-6 border-b border-border/50">
+          <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
+            {isReady ? (
+              <>
+                <CheckCircle2 className="w-5 h-5 text-success" />
+                Your agent is ready
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-5 h-5 text-primary" />
+                Your Agent Plan
+              </>
+            )}
+          </h3>
+        </div>
+        
+        <div className="p-6">
+          {agentPlan ? (
+            <div className="space-y-6">
+              <div className="animate-slide-in">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Goal</p>
+                <p className="text-foreground font-medium">{agentPlan.goal}</p>
+              </div>
+              
+              <div className="animate-slide-in" style={{ animationDelay: '0.05s' }}>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Inputs</p>
+                <div className="flex flex-wrap gap-2">
+                  {agentPlan.inputs.map((input, i) => (
+                    <span key={i} className="px-3 py-1.5 rounded-lg bg-muted text-sm text-foreground">
+                      {input}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="animate-slide-in" style={{ animationDelay: '0.1s' }}>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Actions</p>
+                <div className="space-y-2">
+                  {agentPlan.actions.map((action, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-foreground">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      {action}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="animate-slide-in" style={{ animationDelay: '0.15s' }}>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Tools</p>
+                <div className="flex flex-wrap gap-2">
+                  {agentPlan.tools.map((tool, i) => (
+                    <span key={i} className="px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-sm text-primary">
+                      {tool}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="animate-slide-in" style={{ animationDelay: '0.2s' }}>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Output</p>
+                <p className="text-foreground font-medium">{agentPlan.output}</p>
+              </div>
+              
+              {isReady && (
+                <div className="pt-4 space-y-3 animate-fade-in">
                   <Button
-                    onClick={handleSend}
-                    disabled={isLoading || !input.trim()}
-                    size="icon"
-                    className="bg-gradient-to-r from-primary to-primary-glow"
+                    onClick={handleCreateAgent}
+                    className="w-full h-12 bg-gradient-to-r from-primary to-primary-glow hover:opacity-90 transition-opacity font-medium"
                   >
-                    <Send className="w-4 h-4" />
+                    Create Agent
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setIsReady(false);
+                      setMessages(prev => [...prev, { role: "user", content: "I'd like to make some changes." }]);
+                    }}
+                  >
+                    Refine
                   </Button>
                 </div>
               )}
-            </Card>
-          </div>
-
-          {/* Agent Plan Column */}
-          <div>
-            <Card className="p-6 sticky top-24 bg-gradient-to-br from-card/80 to-card/50 backdrop-blur-sm border-border/50">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                {isComplete ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 text-accent" />
-                    Agent Created
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5 text-primary" />
-                    Agent Plan
-                  </>
-                )}
-              </h3>
-              
-              {agentPlan ? (
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Goal</p>
-                    <p className="text-foreground font-medium">{agentPlan.goal}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Monitoring</p>
-                    <div className="flex flex-wrap gap-2">
-                      {agentPlan.objects.map((obj, i) => (
-                        <span key={i} className="px-2 py-1 rounded-md bg-primary/10 text-primary text-sm">
-                          {obj}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Action</p>
-                    <p className="text-foreground font-medium">{agentPlan.action}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Frequency</p>
-                    <p className="text-foreground font-medium">{agentPlan.frequency}</p>
-                  </div>
-                  {agentPlan.threshold && (
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Threshold</p>
-                      <p className="text-foreground font-medium">{agentPlan.threshold}</p>
-                    </div>
-                  )}
-                  
-                  {!isComplete && (
-                    <Button
-                      onClick={() => {
-                        setMessages(prev => [...prev, { role: "user", content: "Yes, looks perfect!" }]);
-                        handleSend();
-                      }}
-                      className="w-full mt-4 bg-gradient-to-r from-primary to-primary-glow"
-                    >
-                      Confirm & Create
-                    </Button>
-                  )}
-                  
-                  {isComplete && (
-                    <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
-                      <p className="text-sm text-accent font-medium">✓ Agent is now active</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p className="text-sm">
-                    Start chatting to build<br />your agent plan
-                  </p>
-                </div>
-              )}
-            </Card>
-          </div>
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-8 h-8 text-muted-foreground/50" />
+              </div>
+              <p className="text-muted-foreground">
+                Start chatting to build<br />your agent plan
+              </p>
+            </div>
+          )}
         </div>
-      </div>
+      </aside>
     </div>
   );
 };
